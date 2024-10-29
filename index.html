@@ -58,6 +58,32 @@
         input[type="file"] {
             max-width: 150px;
         }
+
+        .canvas-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .preset-dimensions {
+            display: flex;
+            gap: 15px;
+        }
+        .custom-dimensions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .custom-dimensions input[type="number"] {
+            width: 80px;
+            background: #333;
+            border: 1px solid #444;
+            color: white;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .dimension-type {
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -101,12 +127,29 @@
             <button id="recordButton">Start Recording</button>
             <div id="recordingTimer">Recording: 0:00</div>
         </div>
+        <div class="control-group">
+            <div class="direction-controls">
+                <label>Initial Direction:</label>
+                <select id="directionMode">
+                    <option value="fixed">Fixed</option>
+                    <option value="random">Random</option>
+                </select>
+            </div>
+            <label>Initial Speed: <span id="initialSpeedValue">1</span></label>
+            <input type="range" id="initialSpeedControl" min="0.1" max="10" step="0.1" value="1">
+        </div>
     </div>
     <canvas id="canvas" width="800" height="800"></canvas>
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const directionMode = document.getElementById('directionMode');
+        const initialSpeedControl = document.getElementById('initialSpeedControl');
+        const initialSpeedValue = document.getElementById('initialSpeedValue');
 
+        initialSpeedControl.oninput = () => {
+            initialSpeedValue.textContent = initialSpeedControl.value;
+        };
         // Audio context and sound setup
         let audioContext = null;
         let customSound = null;
@@ -506,17 +549,34 @@
         const restartOnRecord = document.getElementById('restartOnRecord');
 
         function resetBall() {
+            const initialSpeed = parseFloat(initialSpeedControl.value);
+            let vx, vy;
+
+            if (directionMode.value === 'random') {
+                // Generate random angle between 0 and 2π
+                const angle = Math.random() * Math.PI * 2;
+                // Convert angle and speed to x and y velocities
+                vx = Math.cos(angle) * initialSpeed;
+                vy = Math.sin(angle) * initialSpeed;
+            } else {
+                // Fixed direction (original behavior)
+                vx = initialSpeed;
+                vy = 0;
+            }
+
             ball = {
                 x: centerX,
                 y: centerY - 300,
-                vx: 3,
-                vy: 0,
+                vx: vx,
+                vy: vy,
                 radius: ballRadius,
                 initialTotalEnergy: 0
             };
             ball.initialTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
             trailBalls = [];
         }
+
+        resetBall();
 
         restartButton.onclick = () => {
             resetBall();
