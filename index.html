@@ -148,7 +148,14 @@
             <label>Line Duration: <span id="lineDurationValue">20</span>s</label>
             <input type="range" id="lineDurationControl" min="0.5" max="60" step="1" value="20">
         </div>
-        
+        <div class="control-group">
+            <label>Number of Balls: <span id="ballCountValue">1</span></label>
+            <input type="range" id="ballCountControl" min="1" max="20" step="1" value="1">
+            <label>
+                <input type="checkbox" id="ballCollisionToggle">
+                Enable Ball Collisions
+            </label>
+        </div>
     </div>
     <canvas id="canvas" width="800" height="800"></canvas>
     <script>
@@ -161,18 +168,15 @@
         initialSpeedControl.oninput = () => {
             initialSpeedValue.textContent = initialSpeedControl.value;
         };
-        // Audio context and sound setup
         let audioContext = null;
         let customSound = null;
         let defaultSound = null;
         
-        // Initialize audio context on user interaction
         document.addEventListener('click', initAudio, { once: true });
 
         function initAudio() {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             
-            // Create default bounce sound
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
             oscillator.connect(gainNode);
@@ -185,7 +189,6 @@
             defaultSound = { oscillator, gainNode };
         }
 
-        // Sound file handling
         const soundFileInput = document.getElementById('soundFileInput');
         soundFileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
@@ -201,7 +204,6 @@
             }
         });
 
-        // Sound controls
         const soundToggle = document.getElementById('soundToggle');
         const volumeControl = document.getElementById('volumeControl');
         const volumeValue = document.getElementById('volumeValue');
@@ -224,7 +226,6 @@
                 gainNode.gain.value = volume;
                 source.start();
             } else {
-                // Play default sound
                 const { gainNode } = defaultSound;
                 gainNode.gain.cancelScheduledValues(audioContext.currentTime);
                 gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
@@ -232,7 +233,6 @@
             }
         }
 
-        // Configuration
         const ringRadius = 380;
         const ballRadius = 15;
         const centerX = canvas.width / 2;
@@ -247,10 +247,9 @@
         maxLinesControl.oninput = () => maxLinesValue.textContent = maxLinesControl.value;
         lineDurationControl.oninput = () => lineDurationValue.textContent = lineDurationControl.value;
 
-        // Add collision lines array
         let collisionLines = [];
 
-        function addCollisionLine(x, y, color) {
+        function addCollisionLine(x, y, color, ball) {  
             if (!linesToggle.checked) return;
             
             collisionLines.push({
@@ -260,12 +259,13 @@
                 endY: y,
                 color: color,
                 timestamp: Date.now(),
-                duration: parseFloat(lineDurationControl.value) * 1000
+                duration: parseFloat(lineDurationControl.value) * 1000,
+                ball: ball  
             });
 
             const maxLines = parseInt(maxLinesControl.value);
             if (collisionLines.length > maxLines) {
-                collisionLines.shift(); // Remove oldest line
+                collisionLines.shift();
             }
         }
 
@@ -276,13 +276,11 @@
                 return age < line.duration;
             });
 
-            // Update end points of lines to follow the ball
             collisionLines.forEach(line => {
-                line.endX = ball.x;
-                line.endY = ball.y;
+                line.endX = line.ball.x;
+                line.endY = line.ball.y;
             });
         }
-        // Controls
         const speedControl = document.getElementById('speedControl');
         const speedValue = document.getElementById('speedValue');
         const trailToggle = document.getElementById('trailToggle');
@@ -295,26 +293,23 @@
         const clearLinesButton = document.getElementById('clearLinesButton');
         const clearAllButton = document.getElementById('clearAllButton');
 
-        // Clear lines button handler
         clearLinesButton.onclick = () => {
             collisionLines = [];
         };
 
-        // Clear all button handler (both trails and lines)
         clearAllButton.onclick = () => {
-            trailBalls = [];
+            balls.forEach(ball => {
+                ball.trails = [];
+            });
             collisionLines = [];
         };
-        // Simulation state
         let isPaused = true;
         let animationFrameId = null;
 
-        // Update display values
         speedControl.oninput = () => speedValue.textContent = speedControl.value;
         intervalControl.oninput = () => intervalValue.textContent = intervalControl.value;
         maxTrailControl.oninput = () => maxTrailValue.textContent = maxTrailControl.value;
 
-        // Pause button handler
         pauseButton.onclick = () => {
             isPaused = !isPaused;
             pauseButton.textContent = isPaused ? "Resume" : "Pause";
@@ -327,20 +322,18 @@
             }
         };
 
-        // Clear trails button handler
         clearTrailsButton.onclick = () => {
-            trailBalls = [];
+            balls.forEach(ball => {
+                ball.trails = [];
+            });
         };
 
-        // Physics constants
         const gravity = 0.5;
         const elasticity = 1;
 
-        // Color cycling configuration
         let colorPhase = 0;
         const colorSpeed = 0.005;
 
-        // Trail system
         let trailBalls = [];
         let lastTrailTime = 0;
         let lastTime = Date.now();
@@ -352,16 +345,66 @@
             return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
         }
 
-        // Ball properties
-        let ball = {
-            x: centerX,
-            y: centerY - 300,
-            vx: 3,
-            vy: 0,
-            radius: ballRadius,
-            initialTotalEnergy: 0
-        };
+        let balls = [];
+        function checkBallCollision(ball1, ball2) {
+            const dx = ball2.x - ball1.x;
+            const dy = ball2.y - ball1.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < (ball1.radius + ball2.radius);
+        }
 
+        function resolveBallCollision(ball1, ball2) {
+            const dx = ball2.x - ball1.x;
+            const dy = ball2.y - ball1.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance === 0) {
+                ball2.x += ball2.radius * 0.1;
+                ball2.y += ball2.radius * 0.1;
+                return;
+            }
+
+            const normal = { 
+                x: dx / distance, 
+                y: dy / distance 
+            };
+
+            const relativeVelocityX = ball2.vx - ball1.vx;
+            const relativeVelocityY = ball2.vy - ball1.vy;
+            
+            const velocityAlongNormal = relativeVelocityX * normal.x + relativeVelocityY * normal.y;
+            
+            if (velocityAlongNormal > 0) {
+                return;
+            }
+
+            const restitution = elasticity;
+
+            const overlap = (ball1.radius + ball2.radius) - distance;
+            const percent = 0.8;
+            const correction = (overlap / 2) * percent;
+            
+            ball1.x -= normal.x * correction;
+            ball1.y -= normal.y * correction;
+            ball2.x += normal.x * correction;
+            ball2.y += normal.y * correction;
+
+            const impulseMagnitude = -(1 + restitution) * velocityAlongNormal;
+            const totalMass = 2; 
+
+            const impulse = {
+                x: normal.x * (impulseMagnitude / totalMass),
+                y: normal.y * (impulseMagnitude / totalMass)
+            };
+
+            ball1.vx -= impulse.x;
+            ball1.vy -= impulse.y;
+            ball2.vx += impulse.x;
+            ball2.vy += impulse.y;
+
+            ball1.initialTotalEnergy = calculateTotalEnergy(ball1.y, ball1.vx, ball1.vy);
+            ball2.initialTotalEnergy = calculateTotalEnergy(ball2.y, ball2.vx, ball2.vy);
+        }
         function distanceFromCenter(x, y) {
             const dx = x - centerX;
             const dy = y - centerY;
@@ -379,8 +422,6 @@
             return kinetic + potential;
         }
 
-        ball.initialTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
-
         function addTrailBall() {
             const currentColor = getCurrentColor();
             trailBalls.push({
@@ -395,7 +436,6 @@
                 trailBalls = trailBalls.slice(-maxTrail);
             }
         }
-
         function update() {
             const currentTime = Date.now();
             const deltaTime = (currentTime - lastTime) / 16.67;
@@ -407,66 +447,116 @@
             }
 
             const speedMultiplier = parseFloat(speedControl.value) * deltaTime;
+            const ballCollisionEnabled = document.getElementById('ballCollisionToggle').checked;
 
-            ball.vy += gravity * speedMultiplier;
-            ball.x += ball.vx * speedMultiplier;
-            ball.y += ball.vy * speedMultiplier;
+            balls.forEach(ball => {
+                ball.vy += gravity * speedMultiplier;
+                ball.x += ball.vx * speedMultiplier;
+                ball.y += ball.vy * speedMultiplier;
+                ball.color = getCurrentColor();
 
-            if (trailToggle.checked) {
-                const now = Date.now();
-                const interval = parseInt(intervalControl.value);
-                if (now - lastTrailTime >= interval) {
-                    addTrailBall();
-                    lastTrailTime = now;
+                if (trailToggle.checked) {
+                    const now = Date.now();
+                    const interval = parseInt(intervalControl.value);
+                    if (now - lastTrailTime >= interval) {
+                        ball.trails = ball.trails || [];
+                        ball.trails.push({
+                            x: ball.x,
+                            y: ball.y,
+                            color: ball.color,
+                            timestamp: now
+                        });
+
+                        const maxTrail = parseInt(maxTrailControl.value);
+                        if (ball.trails.length > maxTrail) {
+                            ball.trails = ball.trails.slice(-maxTrail);
+                        }
+                    }
                 }
-            }
 
-            const distanceToCenter = distanceFromCenter(ball.x, ball.y);
-            if (distanceToCenter + ball.radius > ringRadius) {
-                playBounceSound();
+                const distanceToCenter = distanceFromCenter(ball.x, ball.y);
+                if (distanceToCenter + ball.radius > ringRadius) {
+                    playBounceSound();
 
-                const dx = ball.x - centerX;
-                const dy = ball.y - centerY;
-                const normal = normalizeVector(dx, dy);
+                    const dx = ball.x - centerX;
+                    const dy = ball.y - centerY;
+                    const normal = normalizeVector(dx, dy);
 
-                // Add collision line at the collision point
-                addCollisionLine(
-                    ball.x - normal.x * ball.radius,
-                    ball.y - normal.y * ball.radius,
-                    getCurrentColor()
-                );
+                    addCollisionLine(
+                        ball.x - normal.x * ball.radius,
+                        ball.y - normal.y * ball.radius,
+                        ball.color,
+                        ball
+                    );
 
-                const overlap = distanceToCenter + ball.radius - ringRadius;
-                ball.x -= normal.x * overlap;
-                ball.y -= normal.y * overlap;
+                    // Move ball back to ring boundary
+                    const overlap = distanceToCenter + ball.radius - ringRadius;
+                    ball.x -= normal.x * overlap;
+                    ball.y -= normal.y * overlap;
 
-                const dotProduct = ball.vx * normal.x + ball.vy * normal.y;
-                ball.vx = (ball.vx - 2 * dotProduct * normal.x) * elasticity;
-                ball.vy = (ball.vy - 2 * dotProduct * normal.y) * elasticity;
+                    // Calculate reflection
+                    const dotProduct = ball.vx * normal.x + ball.vy * normal.y;
+                    ball.vx = ball.vx - 2 * dotProduct * normal.x;
+                    ball.vy = ball.vy - 2 * dotProduct * normal.y;
 
-                const currentTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
-                
-                if (Math.abs(currentTotalEnergy - ball.initialTotalEnergy) > 0.1) {
-                    const currentPotential = gravity * (canvas.height - ball.y);
-                    const targetKinetic = ball.initialTotalEnergy - currentPotential;
-                    const currentKinetic = 0.5 * (ball.vx * ball.vx + ball.vy * ball.vy);
-                    
-                    if (currentKinetic > 0) {
-                        const scaleFactor = Math.sqrt(targetKinetic / currentKinetic);
-                        ball.vx *= scaleFactor;
-                        ball.vy *= scaleFactor;
+                    if (!ball.hasCollidedWithWall) {
+                        ball.vx *= 1.5;
+                        ball.vy *= 1.5;
+                        ball.hasCollidedWithWall = true;
+                        ball.initialTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
+                    }
+
+                    // Ensure energy conservation
+                    const currentEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
+                    if (Math.abs(currentEnergy - ball.initialTotalEnergy) > 0.1) {
+                        const energyRatio = Math.sqrt(ball.initialTotalEnergy / currentEnergy);
+                        const velocity = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+                        const angle = Math.atan2(ball.vy, ball.vx);
+                        ball.vx = Math.cos(angle) * velocity * energyRatio;
+                        ball.vy = Math.sin(angle) * velocity * energyRatio;
+                    }
+                }
+            });
+
+            // Ball collision handling with energy preservation
+            if (ballCollisionEnabled) {
+                for (let i = 0; i < balls.length; i++) {
+                    for (let j = i + 1; j < balls.length; j++) {
+                        if (!balls[i] || !balls[j]) continue;
+                        
+                        if (checkBallCollision(balls[i], balls[j])) {
+                            const totalEnergyBefore = 
+                                calculateTotalEnergy(balls[i].y, balls[i].vx, balls[i].vy) +
+                                calculateTotalEnergy(balls[j].y, balls[j].vx, balls[j].vy);
+
+                            resolveBallCollision(balls[i], balls[j]);
+                            playBounceSound();
+
+                            // Ensure total energy is conserved after collision
+                            const totalEnergyAfter = 
+                                calculateTotalEnergy(balls[i].y, balls[i].vx, balls[i].vy) +
+                                calculateTotalEnergy(balls[j].y, balls[j].vx, balls[j].vy);
+
+                            const energyRatio = Math.sqrt(totalEnergyBefore / totalEnergyAfter);
+                            balls[i].vx *= energyRatio;
+                            balls[i].vy *= energyRatio;
+                            balls[j].vx *= energyRatio;
+                            balls[j].vy *= energyRatio;
+                        }
                     }
                 }
             }
 
             updateLines();
+            if (trailToggle.checked) {
+                lastTrailTime = currentTime;
+            }
         }
 
         function draw() {
             ctx.fillStyle = 'black';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw collision lines
             collisionLines.forEach(line => {
                 const age = Date.now() - line.timestamp;
                 const alpha = 1 - (age / line.duration);
@@ -484,18 +574,25 @@
             ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
             ctx.stroke();
 
-            trailBalls.forEach((trailBall, index) => {
-                ctx.beginPath();
-                const alpha = 0.5 * (index / trailBalls.length);
-                ctx.fillStyle = trailBall.color.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
-                ctx.arc(trailBall.x, trailBall.y, ballRadius, 0, Math.PI * 2);
-                ctx.fill();
+            balls.forEach(ball => {
+                if (ball.trails) {
+                    ball.trails.forEach((trailBall, index) => {
+                        ctx.beginPath();
+                        const alpha = 0.5 * (index / ball.trails.length);
+                        ctx.fillStyle = trailBall.color.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+                        ctx.arc(trailBall.x, trailBall.y, ballRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                }
             });
 
-            ctx.beginPath();
-            ctx.fillStyle = getCurrentColor();
-            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-            ctx.fill();
+            // Draw balls
+            balls.forEach(ball => {
+                ctx.beginPath();
+                ctx.fillStyle = ball.color;
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
 
             if (isPaused) {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
@@ -505,6 +602,14 @@
             }
         }
 
+        const ballCountControl = document.getElementById('ballCountControl');
+        const ballCountValue = document.getElementById('ballCountValue');
+
+        ballCountControl.oninput = () => {
+            ballCountValue.textContent = ballCountControl.value;
+            resetBalls();
+        };
+
         function animate() {
             if (!isPaused) {
                 update();
@@ -513,7 +618,6 @@
             }
         }
 
-        // Start animation
         animate();
 
         const recordButton = document.getElementById('recordButton');
@@ -539,12 +643,11 @@
 
         function startRecording() {
             if (restartOnRecord.checked) {
-                resetBall();
+                resetBalls();
             }
             recordedChunks = [];
             const stream = canvas.captureStream();
             
-            // If audio context exists and sound is enabled, add audio track
             if (audioContext && soundToggle.checked) {
                 const audioDestination = audioContext.createMediaStreamDestination();
                 if (defaultSound) {
@@ -575,24 +678,20 @@
                 a.click();
                 URL.revokeObjectURL(url);
                 
-                // Reset UI
                 recordButton.textContent = 'Start Recording';
                 recordButton.classList.remove('recording');
                 recordingTimer.style.display = 'none';
                 clearInterval(recordingInterval);
             };
 
-            // Start recording
             recordingStartTime = Date.now();
             mediaRecorder.start();
             recordButton.textContent = 'Stop Recording';
             recordButton.classList.add('recording');
             recordingTimer.style.display = 'block';
             
-            // Start timer update
             recordingInterval = setInterval(updateRecordingTimer, 1000);
 
-            // Stop recording after duration
             const duration = parseInt(recordingDurationControl.value) * 1000;
             setTimeout(() => {
                 if (mediaRecorder && mediaRecorder.state === 'recording') {
@@ -608,52 +707,77 @@
                 startRecording();
             }
         };
-        // Add mouse interaction
         canvas.addEventListener('click', (e) => {
             if (!isPaused) {
                 const rect = canvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
                 
-                ball.vx = (x - ball.x) * 0.2;
-                ball.vy = (y - ball.y) * 0.2;
+                let nearestBall = balls[0];
+                let nearestDistance = Number.MAX_VALUE;
                 
-                ball.initialTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
+                balls.forEach(ball => {
+                    const dx = x - ball.x;
+                    const dy = y - ball.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        nearestBall = ball;
+                    }
+                });
+                
+                nearestBall.vx = (x - nearestBall.x) * 0.2;
+                nearestBall.vy = (y - nearestBall.y) * 0.2;
+                nearestBall.initialTotalEnergy = calculateTotalEnergy(nearestBall.y, nearestBall.vx, nearestBall.vy);
             }
         });
         const restartButton = document.getElementById('restartButton');
         const restartOnRecord = document.getElementById('restartOnRecord');
 
-        function resetBall() {
-            const initialSpeed = parseFloat(initialSpeedControl.value);
-            let vx, vy;
-
-            if (directionMode.value === 'random') {
-                const angle = Math.random() * Math.PI * 2;
-                vx = Math.cos(angle) * initialSpeed;
-                vy = Math.sin(angle) * initialSpeed;
-            } else {
-                vx = initialSpeed;
-                vy = 0;
-            }
-
-            ball = {
-                x: centerX,
-                y: centerY - 300,
-                vx: vx,
-                vy: vy,
-                radius: ballRadius,
-                initialTotalEnergy: 0
-            };
-            ball.initialTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
+        function resetBalls() {
+            const ballCount = parseInt(ballCountControl.value);
+            balls = [];
             trailBalls = [];
-            collisionLines = []; // Clear collision lines on reset
+            collisionLines = [];
+
+            for (let i = 0; i < ballCount; i++) {
+                const initialSpeed = parseFloat(initialSpeedControl.value);
+                let vx, vy;
+                
+                if (directionMode.value === 'random') {
+                    const angle = Math.random() * Math.PI * 2;
+                    vx = Math.cos(angle) * initialSpeed;
+                    vy = Math.sin(angle) * initialSpeed;
+                } else {
+                    vx = initialSpeed;
+                    vy = 0;
+                }
+
+                const angle = (i / ballCount) * Math.PI * 2;
+                const radius = ringRadius * 0.75;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+
+                const ball = {
+                    x: x,
+                    y: y,
+                    vx: vx,
+                    vy: vy,
+                    radius: ballRadius,
+                    hasCollidedWithWall: false,
+                    initialTotalEnergy: 0,
+                    color: getCurrentColor(),
+                    trails: []
+                };
+                ball.initialTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
+                balls.push(ball);
+            }
         }
 
-        resetBall();
+        resetBalls();
 
         restartButton.onclick = () => {
-            resetBall();
+            resetBalls();
         };
     </script>
 </body>
