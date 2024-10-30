@@ -335,7 +335,6 @@
         const colorSpeed = 0.005;
 
         let trailBalls = [];
-        let lastTrailTime = 0;
         let lastTime = Date.now();
 
         function getCurrentColor() {
@@ -456,9 +455,9 @@
                 ball.color = getCurrentColor();
 
                 if (trailToggle.checked) {
-                    const now = Date.now();
+                    const now = +Date.now();
                     const interval = parseInt(intervalControl.value);
-                    if (now - lastTrailTime >= interval) {
+                    if (now - ball.lastTrailTime >= interval) {
                         ball.trails = ball.trails || [];
                         ball.trails.push({
                             x: ball.x,
@@ -471,6 +470,9 @@
                         if (ball.trails.length > maxTrail) {
                             ball.trails = ball.trails.slice(-maxTrail);
                         }
+
+                        ball.lastTrailTime = +currentTime;
+                    
                     }
                 }
 
@@ -506,6 +508,7 @@
                         ball.initialTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
                     }
 
+                    
                     // Ensure energy conservation
                     const currentEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
                     if (Math.abs(currentEnergy - ball.initialTotalEnergy) > 0.1) {
@@ -548,9 +551,7 @@
             }
 
             updateLines();
-            if (trailToggle.checked) {
-                lastTrailTime = currentTime;
-            }
+            
         }
 
         function draw() {
@@ -767,7 +768,8 @@
                     hasCollidedWithWall: false,
                     initialTotalEnergy: 0,
                     color: getCurrentColor(),
-                    trails: []
+                    trails: [],
+                    lastTrailTime: 0
                 };
                 ball.initialTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
                 balls.push(ball);
