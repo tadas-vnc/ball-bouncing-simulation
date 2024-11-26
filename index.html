@@ -1,786 +1,673 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Configurable Bouncing Ball Simulation</title>
     <style>
         body {
             margin: 0;
+            overflow: hidden;
+            background: black;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            background: #000;
-            color: white;
+            height: 100vh;
             font-family: Arial, sans-serif;
         }
         canvas {
             border: 1px solid #333;
-            margin: 20px;
         }
-        .controls {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            justify-content: center;
-            max-width: 800px;
-            padding: 10px;
+        #settings {
+            position: fixed;
+            top: 20px;
+            right: -300px;
+            width: 280px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #444;
+            padding: 15px;
+            color: white;
+            transition: right 0.3s;
+            border-radius: 8px;
+            z-index: 1000;
+            max-height: 90vh;
+            overflow-y: auto;
         }
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            background: #222;
-            padding: 10px;
-            border-radius: 5px;
+        #settings.visible {
+            right: 20px;
         }
-        label {
-            margin: 5px 0;
+        #settingsBtn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: #444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            z-index: 1001;
+        }
+        .setting-group {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #444;
+        }
+        .setting-group:last-child {
+            border-bottom: none;
+        }
+        .setting-group label {
+            display: block;
+            margin-bottom: 5px;
         }
         input[type="range"] {
-            width: 150px;
+            width: 100%;
+        }
+        select {
+            width: 100%;
+            padding: 5px;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 4px;
         }
         button {
             background: #444;
-            border: none;
             color: white;
+            border: none;
             padding: 8px 16px;
+            margin: 5px;
             border-radius: 4px;
             cursor: pointer;
-            transition: background 0.3s;
         }
         button:hover {
-            background: #666;
+            background: #555;
         }
-        button.active {
-            background: #833;
-        }
-        input[type="file"] {
-            max-width: 150px;
-        }
-
-        .canvas-controls {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .preset-dimensions {
-            display: flex;
-            gap: 15px;
-        }
-        .custom-dimensions {
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
             gap: 10px;
-            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 8px;
         }
-        .custom-dimensions input[type="number"] {
-            width: 80px;
-            background: #333;
-            border: 1px solid #444;
-            color: white;
-            padding: 4px;
-            border-radius: 4px;
-        }
-        .dimension-type {
-            margin-bottom: 10px;
-        }
+		.recording {
+			animation: recordingPulse 2s infinite;
+		}
+		@keyframes recordingPulse {
+			0% { background: #444; }
+			50% { background: #a00; }
+			100% { background: #444; }
+		}
+		.setting-group input[type="number"] {
+			width: 80px;
+			background: #333;
+			color: white;
+			border: 1px solid #444;
+			border-radius: 4px;
+			padding: 5px;
+		}
+		#recordingStatus {
+			display: none;
+			position: fixed;
+			top: 70px;
+			right: 20px;
+			background: rgba(0, 0, 0, 0.8);
+			color: white;
+			padding: 10px;
+			border-radius: 4px;
+			z-index: 1001;
+		}
     </style>
 </head>
 <body>
-    <div class="controls">
-        <div class="control-group">
-            <label>Ball Speed: <span id="speedValue">1</span>x</label>
-            <input type="range" id="speedControl" min="0.1" max="10" step="0.1" value="1">
+    <canvas id="canvas"></canvas>
+    <button id="settingsBtn">⚙️ Settings</button>
+    <div id="settings">
+        <h2>Settings</h2>
+        <div class="setting-group">
+            <label>Boundary Shape:</label>
+            <select id="shapeSelect">
+                <option value="circle">Circle</option>
+                <option value="square">Square</option>
+                <option value="triangle">Triangle</option>
+                <option value="hexagon">Hexagon</option>
+                <option value="octagon">Octagon</option>
+            </select>
         </div>
-        <div class="control-group">
-            <label>Trail Enabled:</label>
-            <input type="checkbox" id="trailToggle">
-        </div>
-        <div class="control-group">
-            <label>Trail Interval: <span id="intervalValue">100</span>ms</label>
-            <input type="range" id="intervalControl" min="10" max="500" step="10" value="100">
-        </div>
-        <div class="control-group">
-            <label>Max Trail Length: <span id="maxTrailValue">100</span></label>
-            <input type="range" id="maxTrailControl" min="10" max="1000" step="10" value="100">
-        </div>
-        <div class="control-group">
-            <label>Sound Enabled:</label>
-            <input type="checkbox" checked="true" id="soundToggle">
-            <label>Sound Volume: <span id="volumeValue">50</span>%</label>
-            <input type="range" id="volumeControl" min="0" max="100" step="1" value="50">
-            <label>Custom Sound:</label>
-            <input type="file" id="soundFileInput" accept="audio/*">
-        </div>
-        <div class="control-group">
-            <button id="pauseButton" class="active">Resume</button>
-            <button id="clearTrailsButton">Clear Trails</button>
-            <button id="clearLinesButton">Clear Lines</button>
-            <button id="clearAllButton">Clear All</button>
-            <button id="restartButton">Restart Simulation</button>
-        </div>
-        <div class="control-group">
-            <label>Recording Duration: <span id="recordingDurationValue">60</span>s</label>
-            <input type="range" id="recordingDurationControl" min="5" max="300" step="5" value="60">
+        <div class="setting-group">
             <label>
-                <input type="checkbox" id="restartOnRecord" checked>
-                Restart on Recording
-            </label>
-            <button id="recordButton">Start Recording</button>
-            <div id="recordingTimer">Recording: 0:00</div>
-        </div>
-        <div class="control-group">
-            <div class="direction-controls">
-                <label>Initial Direction:</label>
-                <select id="directionMode">
-                    <option value="fixed">Fixed</option>
-                    <option value="random">Random</option>
-                </select>
-            </div>
-            <label>Initial Speed: <span id="initialSpeedValue">1</span></label>
-            <input type="range" id="initialSpeedControl" min="0.1" max="10" step="0.1" value="1">
-        </div>
-        <div class="control-group">
-            <label>Collision Lines:</label>
-            <input type="checkbox" id="linesToggle" checked>
-            <label>Max Lines: <span id="maxLinesValue">100</span></label>
-            <input type="range" id="maxLinesControl" min="10" max="500" step="10" value="100">
-            <label>Line Duration: <span id="lineDurationValue">20</span>s</label>
-            <input type="range" id="lineDurationControl" min="0.5" max="60" step="1" value="20">
-        </div>
-        <div class="control-group">
-            <label>Number of Balls: <span id="ballCountValue">1</span></label>
-            <input type="range" id="ballCountControl" min="1" max="20" step="1" value="1">
-            <label>
-                <input type="checkbox" id="ballCollisionToggle">
-                Enable Ball Collisions
+                <input type="checkbox" id="ballCollision" checked> Enable Ball Collisions
             </label>
         </div>
+        <div class="setting-group">
+            <label>Simulation Speed: <span id="speedValue">1.0x</span></label>
+            <input type="range" id="simSpeed" min="0.1" max="10" value="1" step="0.1">
+        </div>
+        <div class="setting-group">
+            <label>
+                <input type="checkbox" id="trailEffect"> Enable Trail Effect
+            </label>
+            <input type="range" id="trailLength" min="1" max="1000" value="20">
+            <label>Trail Length: <span id="trailLengthValue">20</span></label>
+        </div>
+        <div class="setting-group">
+            <label>
+                <input type="checkbox" id="rainbowEffect"> Enable Rainbow Effect
+            </label>
+            <input type="range" id="colorSpeed" min="0.1" max="10" value="5" step="0.1">
+            <label>Color Speed: <span id="colorSpeedValue">5</span></label>
+        </div>
+        <div class="setting-group">
+            <label>Balls: <span id="ballCount">1</span></label>
+            <button id="addBall">Add Ball</button>
+            <button id="removeBall">Remove Ball</button>
+        </div>
+		<div class="setting-group">
+			<label>Initial Ball Count: <span id="initialBallCountValue">1</span></label>
+			<input type="range" id="initialBallCount" min="1" max="50" value="1">
+		</div>
+
+		<div class="setting-group">
+			<h3>Recording Settings</h3>
+			<label>
+				<input type="checkbox" id="restartOnRecord"> Restart on Recording
+			</label>
+			<br>
+			<label>Record Duration (seconds):
+				<input type="number" id="recordDuration" value="60" min="1" max="300">
+			</label>
+			<br>
+			<button id="startRecording">Start Recording</button>
+			<button id="stopRecording" disabled>Stop Recording</button>
+		</div>
     </div>
-    <canvas id="canvas" width="800" height="800"></canvas>
+	<div id="recordingStatus">Recording: <span id="recordingTime">0:00</span></div>
+    <div id="controls">
+        <button id="pauseBtn">⏸️ Pause</button>
+        <button id="restartBtn">🔄 Restart</button>
+        <button id="clearTrailsBtn">🧹 Clear Trails</button>
+    </div>
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const directionMode = document.getElementById('directionMode');
-        const initialSpeedControl = document.getElementById('initialSpeedControl');
-        const initialSpeedValue = document.getElementById('initialSpeedValue');
-
-        initialSpeedControl.oninput = () => {
-            initialSpeedValue.textContent = initialSpeedControl.value;
-        };
-        let audioContext = null;
-        let customSound = null;
-        let defaultSound = null;
         
-        document.addEventListener('click', initAudio, { once: true });
+        canvas.width = 600;
+        canvas.height = 600;
 
-        function initAudio() {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function createCollisionSound() {
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
             
-            oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
-            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-            
             oscillator.start();
-            defaultSound = { oscillator, gainNode };
+            oscillator.stop(audioContext.currentTime + 0.1);
         }
 
-        const soundFileInput = document.getElementById('soundFileInput');
-        soundFileInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                    customSound = audioBuffer;
-                } catch (error) {
-                    console.error('Error loading sound file:', error);
-                    alert('Error loading sound file. Please try another file.');
-                }
-            }
-        });
-
-        const soundToggle = document.getElementById('soundToggle');
-        const volumeControl = document.getElementById('volumeControl');
-        const volumeValue = document.getElementById('volumeValue');
-
-        volumeControl.oninput = () => {
-            volumeValue.textContent = volumeControl.value;
-        };
-
-        function playBounceSound() {
-            if (!soundToggle.checked || !audioContext) return;
-
-            const volume = parseInt(volumeControl.value) / 100;
-
-            if (customSound) {
-                const source = audioContext.createBufferSource();
-                const gainNode = audioContext.createGain();
-                source.buffer = customSound;
-                source.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                gainNode.gain.value = volume;
-                source.start();
-            } else {
-                const { gainNode } = defaultSound;
-                gainNode.gain.cancelScheduledValues(audioContext.currentTime);
-                gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-            }
-        }
-
-        const ringRadius = 380;
-        const ballRadius = 15;
+        let isPlaying = true;
+        const gravity = 0.5;
+        const ballRadius = 10;
+        const boundaryRadius = 250;
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
-
-        const linesToggle = document.getElementById('linesToggle');
-        const maxLinesControl = document.getElementById('maxLinesControl');
-        const maxLinesValue = document.getElementById('maxLinesValue');
-        const lineDurationControl = document.getElementById('lineDurationControl');
-        const lineDurationValue = document.getElementById('lineDurationValue');
-
-        maxLinesControl.oninput = () => maxLinesValue.textContent = maxLinesControl.value;
-        lineDurationControl.oninput = () => lineDurationValue.textContent = lineDurationControl.value;
-
-        let collisionLines = [];
-
-        function addCollisionLine(x, y, color, ball) {  
-            if (!linesToggle.checked) return;
-            
-            collisionLines.push({
-                startX: x,
-                startY: y,
-                endX: x,
-                endY: y,
-                color: color,
-                timestamp: Date.now(),
-                duration: parseFloat(lineDurationControl.value) * 1000,
-                ball: ball  
-            });
-
-            const maxLines = parseInt(maxLinesControl.value);
-            if (collisionLines.length > maxLines) {
-                collisionLines.shift();
-            }
-        }
-
-        function updateLines() {
-            const currentTime = Date.now();
-            collisionLines = collisionLines.filter(line => {
-                const age = currentTime - line.timestamp;
-                return age < line.duration;
-            });
-
-            collisionLines.forEach(line => {
-                line.endX = line.ball.x;
-                line.endY = line.ball.y;
-            });
-        }
-        const speedControl = document.getElementById('speedControl');
+		let mediaRecorder;
+		let recordedChunks = [];
+		let recordingTimer;
+		let recordingInterval;
+		let isRecording = false;
+        // UI Elements
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settings = document.getElementById('settings');
+        const trailEffect = document.getElementById('trailEffect');
+        const trailLength = document.getElementById('trailLength');
+        const trailLengthValue = document.getElementById('trailLengthValue');
+        const rainbowEffect = document.getElementById('rainbowEffect');
+        const colorSpeed = document.getElementById('colorSpeed');
+        const colorSpeedValue = document.getElementById('colorSpeedValue');
+        const shapeSelect = document.getElementById('shapeSelect');
+        const ballCollision = document.getElementById('ballCollision');
+        const simSpeed = document.getElementById('simSpeed');
         const speedValue = document.getElementById('speedValue');
-        const trailToggle = document.getElementById('trailToggle');
-        const intervalControl = document.getElementById('intervalControl');
-        const intervalValue = document.getElementById('intervalValue');
-        const maxTrailControl = document.getElementById('maxTrailControl');
-        const maxTrailValue = document.getElementById('maxTrailValue');
-        const pauseButton = document.getElementById('pauseButton');
-        const clearTrailsButton = document.getElementById('clearTrailsButton');
-        const clearLinesButton = document.getElementById('clearLinesButton');
-        const clearAllButton = document.getElementById('clearAllButton');
-
-        clearLinesButton.onclick = () => {
-            collisionLines = [];
-        };
-
-        clearAllButton.onclick = () => {
-            balls.forEach(ball => {
-                ball.trails = [];
-            });
-            collisionLines = [];
-        };
-        let isPaused = true;
-        let animationFrameId = null;
-
-        speedControl.oninput = () => speedValue.textContent = speedControl.value;
-        intervalControl.oninput = () => intervalValue.textContent = intervalControl.value;
-        maxTrailControl.oninput = () => maxTrailValue.textContent = maxTrailControl.value;
-
-        pauseButton.onclick = () => {
-            isPaused = !isPaused;
-            pauseButton.textContent = isPaused ? "Resume" : "Pause";
-            pauseButton.classList.toggle('active');
-            if (!isPaused) {
-                lastTime = Date.now();
-                animate();
-            } else if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
+		const startRecordingBtn = document.getElementById('startRecording');
+		const stopRecordingBtn = document.getElementById('stopRecording');
+		const restartOnRecord = document.getElementById('restartOnRecord');
+		const recordDuration = document.getElementById('recordDuration');
+		const recordingStatus = document.getElementById('recordingStatus');
+		const recordingTime = document.getElementById('recordingTime');
+		const initialBallCount = document.getElementById('initialBallCount');
+		const initialBallCountValue = document.getElementById('initialBallCountValue');
+        function generatePolygonPoints(sides) {
+            const points = [];
+            for (let i = 0; i < sides; i++) {
+                const angle = (i * 2 * Math.PI / sides) - Math.PI / 2;
+                points.push({
+                    x: centerX + boundaryRadius * Math.cos(angle),
+                    y: centerY + boundaryRadius * Math.sin(angle)
+                });
             }
-        };
-
-        clearTrailsButton.onclick = () => {
-            balls.forEach(ball => {
-                ball.trails = [];
-            });
-        };
-
-        const gravity = 0.5;
-        const elasticity = 1;
-
-        let colorPhase = 0;
-        const colorSpeed = 0.005;
-
-        let trailBalls = [];
-        let lastTime = Date.now();
-
-        function getCurrentColor() {
-            const r = Math.sin(colorPhase) * 127 + 128;
-            const g = Math.sin(colorPhase + (2 * Math.PI / 3)) * 127 + 128;
-            const b = Math.sin(colorPhase + (4 * Math.PI / 3)) * 127 + 128;
-            return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
+            return points;
         }
 
-        let balls = [];
-        function checkBallCollision(ball1, ball2) {
-            const dx = ball2.x - ball1.x;
-            const dy = ball2.y - ball1.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            return distance < (ball1.radius + ball2.radius);
-        }
-
-        function resolveBallCollision(ball1, ball2) {
-            const dx = ball2.x - ball1.x;
-            const dy = ball2.y - ball1.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance === 0) {
-                ball2.x += ball2.radius * 0.1;
-                ball2.y += ball2.radius * 0.1;
-                return;
-            }
-
-            const normal = { 
-                x: dx / distance, 
-                y: dy / distance 
-            };
-
-            const relativeVelocityX = ball2.vx - ball1.vx;
-            const relativeVelocityY = ball2.vy - ball1.vy;
-            
-            const velocityAlongNormal = relativeVelocityX * normal.x + relativeVelocityY * normal.y;
-            
-            if (velocityAlongNormal > 0) {
-                return;
-            }
-
-            const restitution = elasticity;
-
-            const overlap = (ball1.radius + ball2.radius) - distance;
-            const percent = 0.8;
-            const correction = (overlap / 2) * percent;
-            
-            ball1.x -= normal.x * correction;
-            ball1.y -= normal.y * correction;
-            ball2.x += normal.x * correction;
-            ball2.y += normal.y * correction;
-
-            const impulseMagnitude = -(1 + restitution) * velocityAlongNormal;
-            const totalMass = 2; 
-
-            const impulse = {
-                x: normal.x * (impulseMagnitude / totalMass),
-                y: normal.y * (impulseMagnitude / totalMass)
-            };
-
-            ball1.vx -= impulse.x;
-            ball1.vy -= impulse.y;
-            ball2.vx += impulse.x;
-            ball2.vy += impulse.y;
-
-            ball1.initialTotalEnergy = calculateTotalEnergy(ball1.y, ball1.vx, ball1.vy);
-            ball2.initialTotalEnergy = calculateTotalEnergy(ball2.y, ball2.vx, ball2.vy);
-        }
-        function distanceFromCenter(x, y) {
-            const dx = x - centerX;
-            const dy = y - centerY;
-            return Math.sqrt(dx * dx + dy * dy);
-        }
-
-        function normalizeVector(x, y) {
-            const length = Math.sqrt(x * x + y * y);
-            return { x: x / length, y: y / length };
-        }
-
-        function calculateTotalEnergy(y, vx, vy) {
-            const kinetic = 0.5 * (vx * vx + vy * vy);
-            const potential = gravity * (canvas.height - y);
-            return kinetic + potential;
-        }
-
-        function addTrailBall() {
-            const currentColor = getCurrentColor();
-            trailBalls.push({
-                x: ball.x,
-                y: ball.y,
-                color: currentColor,
-                timestamp: Date.now()
-            });
-
-            const maxTrail = parseInt(maxTrailControl.value);
-            if (trailBalls.length > maxTrail) {
-                trailBalls = trailBalls.slice(-maxTrail);
-            }
-        }
-        function update() {
-            const currentTime = Date.now();
-            const deltaTime = (currentTime - lastTime) / 16.67;
-            lastTime = currentTime;
-
-            colorPhase += colorSpeed;
-            if (colorPhase > Math.PI * 2) {
-                colorPhase -= Math.PI * 2;
-            }
-
-            const speedMultiplier = parseFloat(speedControl.value) * deltaTime;
-            const ballCollisionEnabled = document.getElementById('ballCollisionToggle').checked;
-
-            balls.forEach(ball => {
-                ball.vy += gravity * speedMultiplier;
-                ball.x += ball.vx * speedMultiplier;
-                ball.y += ball.vy * speedMultiplier;
-                ball.color = getCurrentColor();
-
-                if (trailToggle.checked) {
-                    const now = +Date.now();
-                    const interval = parseInt(intervalControl.value);
-                    if (now - ball.lastTrailTime >= interval) {
-                        ball.trails = ball.trails || [];
-                        ball.trails.push({
-                            x: ball.x,
-                            y: ball.y,
-                            color: ball.color,
-                            timestamp: now
-                        });
-
-                        const maxTrail = parseInt(maxTrailControl.value);
-                        if (ball.trails.length > maxTrail) {
-                            ball.trails = ball.trails.slice(-maxTrail);
-                        }
-
-                        ball.lastTrailTime = +currentTime;
-                    
-                    }
-                }
-
-                const distanceToCenter = distanceFromCenter(ball.x, ball.y);
-                if (distanceToCenter + ball.radius > ringRadius) {
-                    playBounceSound();
-
-                    const dx = ball.x - centerX;
-                    const dy = ball.y - centerY;
-                    const normal = normalizeVector(dx, dy);
-
-                    addCollisionLine(
-                        ball.x - normal.x * ball.radius,
-                        ball.y - normal.y * ball.radius,
-                        ball.color,
-                        ball
-                    );
-
-                    // Move ball back to ring boundary
-                    const overlap = distanceToCenter + ball.radius - ringRadius;
-                    ball.x -= normal.x * overlap;
-                    ball.y -= normal.y * overlap;
-
-                    // Calculate reflection
-                    const dotProduct = ball.vx * normal.x + ball.vy * normal.y;
-                    ball.vx = ball.vx - 2 * dotProduct * normal.x;
-                    ball.vy = ball.vy - 2 * dotProduct * normal.y;
-
-                    if (!ball.hasCollidedWithWall) {
-                        ball.vx *= 1.5;
-                        ball.vy *= 1.5;
-                        ball.hasCollidedWithWall = true;
-                        ball.initialTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
-                    }
-
-                    
-                    // Ensure energy conservation
-                    const currentEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
-                    if (Math.abs(currentEnergy - ball.initialTotalEnergy) > 0.1) {
-                        const energyRatio = Math.sqrt(ball.initialTotalEnergy / currentEnergy);
-                        const velocity = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-                        const angle = Math.atan2(ball.vy, ball.vx);
-                        ball.vx = Math.cos(angle) * velocity * energyRatio;
-                        ball.vy = Math.sin(angle) * velocity * energyRatio;
-                    }
-                }
-            });
-
-            // Ball collision handling with energy preservation
-            if (ballCollisionEnabled) {
-                for (let i = 0; i < balls.length; i++) {
-                    for (let j = i + 1; j < balls.length; j++) {
-                        if (!balls[i] || !balls[j]) continue;
-                        
-                        if (checkBallCollision(balls[i], balls[j])) {
-                            const totalEnergyBefore = 
-                                calculateTotalEnergy(balls[i].y, balls[i].vx, balls[i].vy) +
-                                calculateTotalEnergy(balls[j].y, balls[j].vx, balls[j].vy);
-
-                            resolveBallCollision(balls[i], balls[j]);
-                            playBounceSound();
-
-                            // Ensure total energy is conserved after collision
-                            const totalEnergyAfter = 
-                                calculateTotalEnergy(balls[i].y, balls[i].vx, balls[i].vy) +
-                                calculateTotalEnergy(balls[j].y, balls[j].vx, balls[j].vy);
-
-                            const energyRatio = Math.sqrt(totalEnergyBefore / totalEnergyAfter);
-                            balls[i].vx *= energyRatio;
-                            balls[i].vy *= energyRatio;
-                            balls[j].vx *= energyRatio;
-                            balls[j].vy *= energyRatio;
-                        }
-                    }
-                }
-            }
-
-            updateLines();
-            
-        }
-
-        function draw() {
-            ctx.fillStyle = 'black';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            collisionLines.forEach(line => {
-                const age = Date.now() - line.timestamp;
-                const alpha = 1 - (age / line.duration);
-                ctx.beginPath();
-                ctx.strokeStyle = line.color.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
-                ctx.lineWidth = 2;
-                ctx.moveTo(line.startX, line.startY);
-                ctx.lineTo(line.endX, line.endY);
-                ctx.stroke();
-            });
-
+        function drawBoundary() {
             ctx.beginPath();
             ctx.strokeStyle = 'white';
             ctx.lineWidth = 2;
-            ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+
+            switch(shapeSelect.value) {
+                case 'circle':
+                    ctx.arc(centerX, centerY, boundaryRadius, 0, Math.PI * 2);
+                    break;
+                case 'square':
+                    const points = generatePolygonPoints(4);
+                    ctx.moveTo(points[0].x, points[0].y);
+                    points.forEach(point => ctx.lineTo(point.x, point.y));
+                    ctx.lineTo(points[0].x, points[0].y);
+                    break;
+                case 'triangle':
+                    const triPoints = generatePolygonPoints(3);
+                    ctx.moveTo(triPoints[0].x, triPoints[0].y);
+                    triPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                    ctx.lineTo(triPoints[0].x, triPoints[0].y);
+                    break;
+                case 'hexagon':
+                    const hexPoints = generatePolygonPoints(6);
+                    ctx.moveTo(hexPoints[0].x, hexPoints[0].y);
+                    hexPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                    ctx.lineTo(hexPoints[0].x, hexPoints[0].y);
+                    break;
+                case 'octagon':
+                    const octPoints = generatePolygonPoints(8);
+                    ctx.moveTo(octPoints[0].x, octPoints[0].y);
+                    octPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                    ctx.lineTo(octPoints[0].x, octPoints[0].y);
+                    break;
+            }
             ctx.stroke();
-
-            balls.forEach(ball => {
-                if (ball.trails) {
-                    ball.trails.forEach((trailBall, index) => {
-                        ctx.beginPath();
-                        const alpha = 0.5 * (index / ball.trails.length);
-                        ctx.fillStyle = trailBall.color.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
-                        ctx.arc(trailBall.x, trailBall.y, ballRadius, 0, Math.PI * 2);
-                        ctx.fill();
-                    });
-                }
-            });
-
-            // Draw balls
-            balls.forEach(ball => {
-                ctx.beginPath();
-                ctx.fillStyle = ball.color;
-                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            if (isPaused) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.font = '24px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('PAUSED', centerX, 40);
-            }
         }
 
-        const ballCountControl = document.getElementById('ballCountControl');
-        const ballCountValue = document.getElementById('ballCountValue');
-
-        ballCountControl.oninput = () => {
-            ballCountValue.textContent = ballCountControl.value;
-            resetBalls();
-        };
-
-        function animate() {
-            if (!isPaused) {
-                update();
-                draw();
-                animationFrameId = requestAnimationFrame(animate);
-            }
-        }
-
-        animate();
-
-        const recordButton = document.getElementById('recordButton');
-        const recordingDurationControl = document.getElementById('recordingDurationControl');
-        const recordingDurationValue = document.getElementById('recordingDurationValue');
-        const recordingTimer = document.getElementById('recordingTimer');
-        
-        let mediaRecorder = null;
-        let recordedChunks = [];
-        let recordingStartTime = 0;
-        let recordingInterval = null;
-
-        recordingDurationControl.oninput = () => {
-            recordingDurationValue.textContent = recordingDurationControl.value;
-        };
-
-        function updateRecordingTimer() {
-            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-            const minutes = Math.floor(elapsed / 60);
-            const seconds = elapsed % 60;
-            recordingTimer.textContent = `Recording: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }
-
-        function startRecording() {
-            if (restartOnRecord.checked) {
-                resetBalls();
-            }
-            recordedChunks = [];
-            const stream = canvas.captureStream();
-            
-            if (audioContext && soundToggle.checked) {
-                const audioDestination = audioContext.createMediaStreamDestination();
-                if (defaultSound) {
-                    defaultSound.gainNode.connect(audioDestination);
-                }
-                const audioTracks = audioDestination.stream.getAudioTracks();
-                audioTracks.forEach(track => stream.addTrack(track));
-            }
-
-            mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'video/webm;codecs=vp9'
-            });
-
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    recordedChunks.push(event.data);
-                }
-            };
-
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, {
-                    type: 'video/webm'
-                });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'ball-simulation.webm';
-                a.click();
-                URL.revokeObjectURL(url);
+        function checkPolygonCollision(ball, points) {
+            for (let i = 0; i < points.length; i++) {
+                const p1 = points[i];
+                const p2 = points[(i + 1) % points.length];
                 
-                recordButton.textContent = 'Start Recording';
-                recordButton.classList.remove('recording');
-                recordingTimer.style.display = 'none';
-                clearInterval(recordingInterval);
-            };
+                const normal = {
+                    x: -(p2.y - p1.y),
+                    y: p2.x - p1.x
+                };
+                const length = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
+                normal.x /= length;
+                normal.y /= length;
 
-            recordingStartTime = Date.now();
-            mediaRecorder.start();
-            recordButton.textContent = 'Stop Recording';
-            recordButton.classList.add('recording');
-            recordingTimer.style.display = 'block';
-            
-            recordingInterval = setInterval(updateRecordingTimer, 1000);
-
-            const duration = parseInt(recordingDurationControl.value) * 1000;
-            setTimeout(() => {
-                if (mediaRecorder && mediaRecorder.state === 'recording') {
-                    mediaRecorder.stop();
+                const d = (ball.x - p1.x) * normal.x + (ball.y - p1.y) * normal.y;
+                
+                if (Math.abs(d) <= ball.radius) {
+                    createCollisionSound();
+                    const dotProduct = ball.vx * normal.x + ball.vy * normal.y;
+                    ball.vx -= 2 * dotProduct * normal.x;
+                    ball.vy -= 2 * dotProduct * normal.y;
+                    
+                    const correction = (ball.radius - d) * 1.001;
+                    ball.x += normal.x * correction;
+                    ball.y += normal.y * correction;
+                    return true;
                 }
-            }, duration);
+            }
+            return false;
         }
 
-        recordButton.onclick = () => {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-            } else {
-                startRecording();
+        class Ball {
+            constructor(x, y, vx, vy) {
+                this.x = x ?? centerX;
+                this.y = y ?? centerY - 100;
+                this.vx = vx ?? (Math.random() * 10 - 5);
+                this.vy = vy ?? 0;
+                this.radius = ballRadius;
+                this.hue = Math.random() * 360;
+                this.trail = [];
+                this.initialEnergy = this.calculateEnergy();
             }
-        };
-        canvas.addEventListener('click', (e) => {
-            if (!isPaused) {
-                const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                
-                let nearestBall = balls[0];
-                let nearestDistance = Number.MAX_VALUE;
-                
-                balls.forEach(ball => {
-                    const dx = x - ball.x;
-                    const dy = y - ball.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    if (distance < nearestDistance) {
-                        nearestDistance = distance;
-                        nearestBall = ball;
+
+            calculateEnergy() {
+                const dy = this.y - centerY;
+                const potentialEnergy = gravity * (-dy + boundaryRadius);
+                const kineticEnergy = (this.vx * this.vx + this.vy * this.vy) / 2;
+                return potentialEnergy + kineticEnergy;
+            }
+
+            maintainEnergy() {
+                const currentEnergy = this.calculateEnergy();
+                const energyDiff = this.initialEnergy - currentEnergy;
+                if (Math.abs(energyDiff) > 0.01) {
+                    const velocityMagnitude = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                    if (velocityMagnitude > 0) {
+                        const scaleFactor = Math.sqrt(1 + 2 * energyDiff / (velocityMagnitude * velocityMagnitude));
+                        this.vx *= scaleFactor;
+                        this.vy *= scaleFactor;
                     }
-                });
+                }
+            }
+
+            checkCollisionWithBall(otherBall) {
+                if (!ballCollision.checked) return;
                 
-                nearestBall.vx = (x - nearestBall.x) * 0.2;
-                nearestBall.vy = (y - nearestBall.y) * 0.2;
-                nearestBall.initialTotalEnergy = calculateTotalEnergy(nearestBall.y, nearestBall.vx, nearestBall.vy);
+                const dx = this.x - otherBall.x;
+                const dy = this.y - otherBall.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < this.radius + otherBall.radius) {
+                    createCollisionSound();
+                    const nx = dx / distance;
+                    const ny = dy / distance;
+                    
+                    const relativeVelocityX = this.vx - otherBall.vx;
+                    const relativeVelocityY = this.vy - otherBall.vy;
+                    
+                    const impulse = 2 * (relativeVelocityX * nx + relativeVelocityY * ny) / 2;
+                    
+                    this.vx -= impulse * nx;
+                    this.vy -= impulse * ny;
+                    otherBall.vx += impulse * nx;
+                    otherBall.vy += impulse * ny;
+                    
+                    const correction = (this.radius + otherBall.radius - distance) / 2;
+                    this.x += nx * correction;
+                    this.y += ny * correction;
+                    otherBall.x -= nx * correction;
+                    otherBall.y -= ny * correction;
+                }
+            }
+
+            updateTrail() {
+                if (trailEffect.checked) {
+                    this.trail.push({ x: this.x, y: this.y, color: this.getColor() });
+                    if (this.trail.length > parseInt(trailLength.value)) {
+                        this.trail.shift();
+                    }
+                }
+            }
+
+            getColor() {
+                if (rainbowEffect.checked) {
+                    this.hue = (this.hue + parseFloat(colorSpeed.value) / 2) % 360;
+                    return `hsl(${this.hue}, 100%, 50%)`;
+                }
+                return 'white';
+            }
+
+            draw() {
+                this.trail.forEach((pos, index) => {
+                    const alpha = index / this.trail.length;
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = pos.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+                    ctx.fill();
+                });
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.getColor();
+                ctx.fill();
+            }
+
+            checkBoundaryCollision() {
+                if (shapeSelect.value === 'circle') {
+                    const dx = this.x - centerX;
+                    const dy = this.y - centerY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance + this.radius > boundaryRadius) {
+                        createCollisionSound();
+                        const nx = dx / distance;
+                        const ny = dy / distance;
+                        const vn = this.vx * nx + this.vy * ny;
+                        
+                        this.vx = this.vx - 2 * vn * nx;
+                        this.vy = this.vy - 2 * vn * ny;
+
+                        const correction = (distance + this.radius - boundaryRadius) * 1.001;
+                        this.x -= nx * correction;
+                        this.y -= ny * correction;
+                    }
+                } else {
+                    const points = generatePolygonPoints(
+                        shapeSelect.value === 'square' ? 4 :
+                        shapeSelect.value === 'triangle' ? 3 :
+                        shapeSelect.value === 'hexagon' ? 6 : 8
+                    );
+                    checkPolygonCollision(this, points);
+                }
+            }
+
+            update() {
+                const speedMultiplier = parseFloat(simSpeed.value);
+                this.vy += gravity * speedMultiplier;
+                this.x += this.vx * speedMultiplier;
+                this.y += this.vy * speedMultiplier;
+                this.updateTrail();
+                this.checkBoundaryCollision();
+                this.maintainEnergy();
+            }
+        }
+
+        let balls = [new Ball()];
+
+        // Event Listeners
+        document.addEventListener('click', (e) => {
+            if (!settings.contains(e.target) && e.target !== settingsBtn) {
+                settings.classList.remove('visible');
             }
         });
-        const restartButton = document.getElementById('restartButton');
-        const restartOnRecord = document.getElementById('restartOnRecord');
 
-        function resetBalls() {
-            const ballCount = parseInt(ballCountControl.value);
-            balls = [];
-            trailBalls = [];
-            collisionLines = [];
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settings.classList.toggle('visible');
+        });
 
-            for (let i = 0; i < ballCount; i++) {
-                const initialSpeed = parseFloat(initialSpeedControl.value);
-                let vx, vy;
-                
-                if (directionMode.value === 'random') {
-                    const angle = Math.random() * Math.PI * 2;
-                    vx = Math.cos(angle) * initialSpeed;
-                    vy = Math.sin(angle) * initialSpeed;
-                } else {
-                    vx = initialSpeed;
-                    vy = 0;
-                }
+        const pauseBtn = document.getElementById('pauseBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const clearTrailsBtn = document.getElementById('clearTrailsBtn');
+        const addBallBtn = document.getElementById('addBall');
+        const removeBallBtn = document.getElementById('removeBall');
+        const ballCountSpan = document.getElementById('ballCount');
 
-                const angle = (i / ballCount) * Math.PI * 2;
-                const radius = ringRadius * 0.75;
-                const x = centerX + Math.cos(angle) * radius;
-                const y = centerY + Math.sin(angle) * radius;
+        pauseBtn.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            pauseBtn.textContent = isPlaying ? '⏸️ Pause' : '▶️ Resume';
+            if (isPlaying) update();
+        });
 
-                const ball = {
-                    x: x,
-                    y: y,
-                    vx: vx,
-                    vy: vy,
-                    radius: ballRadius,
-                    hasCollidedWithWall: false,
-                    initialTotalEnergy: 0,
-                    color: getCurrentColor(),
-                    trails: [],
-                    lastTrailTime: 0
-                };
-                ball.initialTotalEnergy = calculateTotalEnergy(ball.y, ball.vx, ball.vy);
-                balls.push(ball);
+        restartBtn.addEventListener('click', () => {
+            balls = [new Ball()];
+            ballCountSpan.textContent = balls.length;
+        });
+
+        clearTrailsBtn.addEventListener('click', () => {
+            balls.forEach(ball => ball.trail = []);
+        });
+
+        addBallBtn.addEventListener('click', () => {
+            if (balls.length < 10) {
+                balls.push(new Ball());
+                ballCountSpan.textContent = balls.length;
             }
+        });
+
+        removeBallBtn.addEventListener('click', () => {
+            if (balls.length > 1) {
+                balls.pop();
+                ballCountSpan.textContent = balls.length;
+            }
+        });
+
+        trailLength.addEventListener('input', () => {
+            trailLengthValue.textContent = trailLength.value;
+        });
+
+        colorSpeed.addEventListener('input', () => {
+            colorSpeedValue.textContent = colorSpeed.value;
+        });
+
+        simSpeed.addEventListener('input', () => {
+            speedValue.textContent = `${simSpeed.value}x`;
+        });
+
+        function update() {
+            if (!isPlaying) return;
+
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawBoundary();
+
+            for (let i = 0; i < balls.length; i++) {
+                for (let j = i + 1; j < balls.length; j++) {
+                    balls[i].checkCollisionWithBall(balls[j]);
+                }
+            }
+
+            balls.forEach(ball => {
+                ball.update();
+                ball.draw();
+            });
+
+            requestAnimationFrame(update);
         }
+		async function setupRecording() {
+    const canvasStream = canvas.captureStream(60);
+    const audioDestination = audioContext.createMediaStreamDestination();
+    const gainNode = audioContext.createGain();
+    gainNode.gain.value = 1.0;
+    gainNode.connect(audioDestination);
 
-        resetBalls();
+    // Modify the createCollisionSound function to also send sound to the recording
+    window.createCollisionSound = function() {
+        const oscillator = audioContext.createOscillator();
+        const collisionGain = audioContext.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
+        
+        collisionGain.gain.setValueAtTime(0.3, audioContext.currentTime);
+        collisionGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        
+        oscillator.connect(collisionGain);
+        collisionGain.connect(gainNode);
+        collisionGain.connect(audioContext.destination);
+        
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.1);
+    };
 
-        restartButton.onclick = () => {
-            resetBalls();
-        };
+    const combinedStream = new MediaStream([
+        ...canvasStream.getVideoTracks(),
+        ...audioDestination.stream.getAudioTracks()
+    ]);
+
+    mediaRecorder = new MediaRecorder(combinedStream, {
+        mimeType: 'video/webm;codecs=vp9',
+        videoBitsPerSecond: 5000000
+    });
+
+    mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+            recordedChunks.push(event.data);
+        }
+    };
+
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ball-physics-${new Date().toISOString()}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
+        recordedChunks = [];
+        
+        // Reset UI
+        startRecordingBtn.disabled = false;
+        stopRecordingBtn.disabled = true;
+        recordingStatus.style.display = 'none';
+        startRecordingBtn.classList.remove('recording');
+    };
+}
+
+	function updateRecordingTimer(startTime) {
+		const elapsed = Math.floor((Date.now() - startTime) / 1000);
+		const minutes = Math.floor(elapsed / 60);
+		const seconds = elapsed % 60;
+		recordingTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+	}
+
+	function startRecording() {
+		if (isRecording) return;
+		
+		setupRecording().then(() => {
+			recordedChunks = [];
+			
+			if (restartOnRecord.checked) {
+				restartBtn.click();
+			}
+			
+			const startTime = Date.now();
+			recordingStatus.style.display = 'block';
+			recordingInterval = setInterval(() => updateRecordingTimer(startTime), 1000);
+			
+			mediaRecorder.start();
+			isRecording = true;
+			startRecordingBtn.disabled = true;
+			stopRecordingBtn.disabled = false;
+			startRecordingBtn.classList.add('recording');
+			
+			// Auto-stop after duration
+			const duration = parseInt(recordDuration.value) * 1000;
+			recordingTimer = setTimeout(() => stopRecording(), duration);
+		});
+	}
+
+	function stopRecording() {
+		if (!isRecording) return;
+		
+		clearTimeout(recordingTimer);
+		clearInterval(recordingInterval);
+		mediaRecorder.stop();
+		isRecording = false;
+	}
+
+	// Add these event listeners
+	startRecordingBtn.addEventListener('click', startRecording);
+	stopRecordingBtn.addEventListener('click', stopRecording);
+
+	initialBallCount.addEventListener('input', () => {
+		initialBallCountValue.textContent = initialBallCount.value;
+	});
+
+	// Modify the restart button event listener
+	restartBtn.addEventListener('click', () => {
+		const count = parseInt(initialBallCount.value);
+		
+		balls = Array(1).fill(0).map(() => new Ball());
+		for(let i = 0; i < count-1; i++){
+			setTimeout(()=>{
+				balls.push(new Ball())
+				ballCountSpan.textContent = balls.length;
+			},100+i*100)
+		}
+	});
+
+        update();
     </script>
 </body>
 </html>
