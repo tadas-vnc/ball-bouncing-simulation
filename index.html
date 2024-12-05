@@ -868,8 +868,28 @@
             const [width, height] = canvasResolution.value.split('x').map(Number);
             canvas.width = width;
             canvas.height = height;
-            // Optionally, restart the simulation to fit the new canvas size
+            
+            // Update center coordinates based on new canvas dimensions
+            centerX = canvas.width / 2;
+            centerY = canvas.height / 2;
             restartBtn.click();
+            // Update all balls to new center position
+            balls.forEach(ball => {
+                // Calculate relative position from old center
+                const dx = ball.x - centerX;
+                const dy = ball.y - centerY;
+                
+                // Update position relative to new center
+                ball.x = centerX + dx;
+                ball.y = centerY + dy;
+                
+                // Clear trail since old trail positions would be incorrect
+                ball.trail = [];
+            });
+            
+            // Clear canvas and redraw
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBoundary();
         });
 
         const clearCanvasBtn = document.getElementById('clearCanvasBtn');
