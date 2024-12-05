@@ -189,6 +189,22 @@
                 <option value="600x1280">600x1280</option>
             </select>
         </div>
+        <div class="setting-group">
+            <label>
+                <input type="checkbox" id="drawInsideShape"> Enable Shape Background
+            </label>
+            <div style="margin-top: 10px;">
+                <label>
+                    <input type="radio" name="backgroundColorType" id="solidColor" checked> Solid Color
+                </label>
+                <input type="color" id="shapeBackgroundColor" value="#333333">
+                <button id="randomColorBtn">Set Random Color</button>
+                <br>
+                <label>
+                    <input type="radio" name="backgroundColorType" id="rainbowColor"> Rainbow Background
+                </label>
+            </div>
+        </div>
     </div>
 	<div id="recordingStatus">Recording: <span id="recordingTime">0:00</span></div>
     <div id="controls">
@@ -255,6 +271,10 @@
 		const recordingTime = document.getElementById('recordingTime');
 		const initialBallCount = document.getElementById('initialBallCount');
 		const initialBallCountValue = document.getElementById('initialBallCountValue');
+        const shapeBackgroundColor = document.getElementById('shapeBackgroundColor');
+        const solidColor = document.getElementById('solidColor');
+        const rainbowColor = document.getElementById('rainbowColor');
+        const randomColorBtn = document.getElementById('randomColorBtn');
         function generatePolygonPoints(sides) {
             const points = [];
             for (let i = 0; i < sides; i++) {
@@ -272,33 +292,51 @@
             ctx.strokeStyle = 'white';
             ctx.lineWidth = 2;
 
+            if (drawInsideShape.checked) {
+                if (rainbowColor.checked) {
+                    const hue = (Date.now() / 50) % 360;
+                    ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.1)`;
+                } else {
+                    const color = shapeBackgroundColor.value;
+                    const r = parseInt(color.substr(1,2), 16);
+                    const g = parseInt(color.substr(3,2), 16);
+                    const b = parseInt(color.substr(5,2), 16);
+                    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.1)`;
+                }
+            }
+
             switch(shapeSelect.value) {
                 case 'circle':
                     ctx.arc(centerX, centerY, boundaryRadius, 0, Math.PI * 2);
+                    if (drawInsideShape.checked) ctx.fill();
                     break;
                 case 'square':
                     const points = generatePolygonPoints(4);
                     ctx.moveTo(points[0].x, points[0].y);
                     points.forEach(point => ctx.lineTo(point.x, point.y));
                     ctx.lineTo(points[0].x, points[0].y);
+                    if (drawInsideShape.checked) ctx.fill();
                     break;
                 case 'triangle':
                     const triPoints = generatePolygonPoints(3);
                     ctx.moveTo(triPoints[0].x, triPoints[0].y);
                     triPoints.forEach(point => ctx.lineTo(point.x, point.y));
                     ctx.lineTo(triPoints[0].x, triPoints[0].y);
+                    if (drawInsideShape.checked) ctx.fill();
                     break;
                 case 'hexagon':
                     const hexPoints = generatePolygonPoints(6);
                     ctx.moveTo(hexPoints[0].x, hexPoints[0].y);
                     hexPoints.forEach(point => ctx.lineTo(point.x, point.y));
                     ctx.lineTo(hexPoints[0].x, hexPoints[0].y);
+                    if (drawInsideShape.checked) ctx.fill();
                     break;
                 case 'octagon':
                     const octPoints = generatePolygonPoints(8);
                     ctx.moveTo(octPoints[0].x, octPoints[0].y);
                     octPoints.forEach(point => ctx.lineTo(point.x, point.y));
                     ctx.lineTo(octPoints[0].x, octPoints[0].y);
+                    if (drawInsideShape.checked) ctx.fill();
                     break;
             }
             ctx.stroke();
@@ -681,13 +719,15 @@
             const [width, height] = canvasResolution.value.split('x').map(Number);
             canvas.width = width;
             canvas.height = height;
-            
-            // Update center coordinates
-            centerX = canvas.width / 2;
-            centerY = canvas.height / 2;
-            
             // Optionally, restart the simulation to fit the new canvas size
             restartBtn.click();
+        });
+
+        // Add event listener for the random color button
+        randomColorBtn.addEventListener('click', () => {
+            const randomColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
+            shapeBackgroundColor.value = randomColor;
+            solidColor.checked = true; // Switch to solid color mode
         });
 
         update();
