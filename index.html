@@ -181,6 +181,14 @@
 			<button id="startRecording">Start Recording</button>
 			<button id="stopRecording" disabled>Stop Recording</button>
 		</div>
+        <div class="setting-group">
+            <label>Canvas Resolution:</label>
+            <select id="canvasResolution">
+                <option value="600x600">600x600</option>
+                <option value="1280x600">1280x600</option>
+                <option value="600x1280">600x1280</option>
+            </select>
+        </div>
     </div>
 	<div id="recordingStatus">Recording: <span id="recordingTime">0:00</span></div>
     <div id="controls">
@@ -219,8 +227,8 @@
         const gravity = 0.5;
         const ballRadius = 10;
         const boundaryRadius = 250;
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
+        let centerX = canvas.width / 2;
+        let centerY = canvas.height / 2;
 		let mediaRecorder;
 		let recordedChunks = [];
 		let recordingTimer;
@@ -666,6 +674,21 @@
 			},100+i*100)
 		}
 	});
+
+        const canvasResolution = document.getElementById('canvasResolution');
+
+        canvasResolution.addEventListener('change', () => {
+            const [width, height] = canvasResolution.value.split('x').map(Number);
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Update center coordinates
+            centerX = canvas.width / 2;
+            centerY = canvas.height / 2;
+            
+            // Optionally, restart the simulation to fit the new canvas size
+            restartBtn.click();
+        });
 
         update();
     </script>
