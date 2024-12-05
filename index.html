@@ -380,6 +380,7 @@
                 this.vy = vy ?? 0;
                 this.radius = ballRadius;
                 this.hue = Math.random() * 360;
+                this.defaultColor = `hsl(${this.hue}, 70%, 50%)`;
                 this.trail = [];
                 this.initialEnergy = this.calculateEnergy();
             }
@@ -448,7 +449,7 @@
                     this.hue = (this.hue + parseFloat(colorSpeed.value) / 2) % 360;
                     return `hsl(${this.hue}, 100%, 50%)`;
                 }
-                return 'white';
+                return this.defaultColor;
             }
 
             draw() {
@@ -721,13 +722,6 @@
             canvas.height = height;
             // Optionally, restart the simulation to fit the new canvas size
             restartBtn.click();
-        });
-
-        // Add event listener for the random color button
-        randomColorBtn.addEventListener('click', () => {
-            const randomColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
-            shapeBackgroundColor.value = randomColor;
-            solidColor.checked = true; // Switch to solid color mode
         });
 
         update();
