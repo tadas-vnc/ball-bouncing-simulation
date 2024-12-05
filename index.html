@@ -205,12 +205,25 @@
                 </label>
             </div>
         </div>
+        <div class="setting-group">
+            <label>
+                <input type="checkbox" id="paintEffect"> Enable Paint Effect
+            </label>
+            <label>Paint Opacity: <span id="paintOpacityValue">0.1</span></label>
+            <input type="range" id="paintOpacity" min="0.01" max="1" value="0.1" step="0.01">
+        </div>
+		<div class="setting-group">
+			<label>
+				<input type="checkbox" id="randomPitch"> Random Pitch on Collision
+			</label>
+		</div>
     </div>
 	<div id="recordingStatus">Recording: <span id="recordingTime">0:00</span></div>
     <div id="controls">
         <button id="pauseBtn">⏸️ Pause</button>
         <button id="restartBtn">🔄 Restart</button>
         <button id="clearTrailsBtn">🧹 Clear Trails</button>
+        <button id="clearCanvasBtn">🎨 Clear Canvas</button>
     </div>
     <script>
         const canvas = document.getElementById('canvas');
@@ -226,8 +239,11 @@
             const gainNode = audioContext.createGain();
             
             oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
-            oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
+            
+            // Check if random pitch is enabled
+            const baseFrequency = randomPitch.checked ? Math.random() * 300 + 200 : 400;
+            oscillator.frequency.setValueAtTime(baseFrequency, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(baseFrequency / 4, audioContext.currentTime + 0.1);
             
             gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
@@ -275,6 +291,9 @@
         const solidColor = document.getElementById('solidColor');
         const rainbowColor = document.getElementById('rainbowColor');
         const randomColorBtn = document.getElementById('randomColorBtn');
+        const paintEffect = document.getElementById('paintEffect');
+        const paintOpacity = document.getElementById('paintOpacity');
+        const paintOpacityValue = document.getElementById('paintOpacityValue');
         function generatePolygonPoints(sides) {
             const points = [];
             for (let i = 0; i < sides; i++) {
@@ -292,51 +311,92 @@
             ctx.strokeStyle = 'white';
             ctx.lineWidth = 2;
 
+            // Draw the shape background first if enabled
             if (drawInsideShape.checked) {
+                ctx.save(); // Save the current state
+                ctx.globalCompositeOperation = 'destination-over'; // Draw behind existing drawings
+
+                // Use a fixed alpha value to prevent saturation
+                const alpha = 0.05; // Adjust this value to control the dimness
+
                 if (rainbowColor.checked) {
                     const hue = (Date.now() / 50) % 360;
-                    ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.1)`;
+                    ctx.fillStyle = `hsla(${hue}, 70%, 50%, ${alpha})`;
                 } else {
                     const color = shapeBackgroundColor.value;
                     const r = parseInt(color.substr(1,2), 16);
                     const g = parseInt(color.substr(3,2), 16);
                     const b = parseInt(color.substr(5,2), 16);
-                    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.1)`;
+                    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
                 }
+
+                switch(shapeSelect.value) {
+                    case 'circle':
+                        ctx.arc(centerX, centerY, boundaryRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+                    case 'square':
+                        const points = generatePolygonPoints(4);
+                        ctx.moveTo(points[0].x, points[0].y);
+                        points.forEach(point => ctx.lineTo(point.x, point.y));
+                        ctx.closePath();
+                        ctx.fill();
+                        break;
+                    case 'triangle':
+                        const triPoints = generatePolygonPoints(3);
+                        ctx.moveTo(triPoints[0].x, triPoints[0].y);
+                        triPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                        ctx.closePath();
+                        ctx.fill();
+                        break;
+                    case 'hexagon':
+                        const hexPoints = generatePolygonPoints(6);
+                        ctx.moveTo(hexPoints[0].x, hexPoints[0].y);
+                        hexPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                        ctx.closePath();
+                        ctx.fill();
+                        break;
+                    case 'octagon':
+                        const octPoints = generatePolygonPoints(8);
+                        ctx.moveTo(octPoints[0].x, octPoints[0].y);
+                        octPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                        ctx.closePath();
+                        ctx.fill();
+                        break;
+                }
+
+                ctx.restore(); // Restore the state to draw the stroke on top
             }
 
+            // Draw the boundary stroke on top
+            ctx.beginPath();
             switch(shapeSelect.value) {
                 case 'circle':
                     ctx.arc(centerX, centerY, boundaryRadius, 0, Math.PI * 2);
-                    if (drawInsideShape.checked) ctx.fill();
                     break;
                 case 'square':
                     const points = generatePolygonPoints(4);
                     ctx.moveTo(points[0].x, points[0].y);
                     points.forEach(point => ctx.lineTo(point.x, point.y));
-                    ctx.lineTo(points[0].x, points[0].y);
-                    if (drawInsideShape.checked) ctx.fill();
+                    ctx.closePath();
                     break;
                 case 'triangle':
                     const triPoints = generatePolygonPoints(3);
                     ctx.moveTo(triPoints[0].x, triPoints[0].y);
                     triPoints.forEach(point => ctx.lineTo(point.x, point.y));
-                    ctx.lineTo(triPoints[0].x, triPoints[0].y);
-                    if (drawInsideShape.checked) ctx.fill();
+                    ctx.closePath();
                     break;
                 case 'hexagon':
                     const hexPoints = generatePolygonPoints(6);
                     ctx.moveTo(hexPoints[0].x, hexPoints[0].y);
                     hexPoints.forEach(point => ctx.lineTo(point.x, point.y));
-                    ctx.lineTo(hexPoints[0].x, hexPoints[0].y);
-                    if (drawInsideShape.checked) ctx.fill();
+                    ctx.closePath();
                     break;
                 case 'octagon':
                     const octPoints = generatePolygonPoints(8);
                     ctx.moveTo(octPoints[0].x, octPoints[0].y);
                     octPoints.forEach(point => ctx.lineTo(point.x, point.y));
-                    ctx.lineTo(octPoints[0].x, octPoints[0].y);
-                    if (drawInsideShape.checked) ctx.fill();
+                    ctx.closePath();
                     break;
             }
             ctx.stroke();
@@ -453,14 +513,24 @@
             }
 
             draw() {
+                // Draw paint effect if enabled
+                if (paintEffect.checked) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.getColor().replace(')', `, ${paintOpacity.value})`).replace('hsl', 'hsla');
+                    ctx.fill();
+                }
+
+                // Draw trails if enabled
                 this.trail.forEach((pos, index) => {
                     const alpha = index / this.trail.length;
                     ctx.beginPath();
                     ctx.arc(pos.x, pos.y, this.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = pos.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+                    ctx.fillStyle = pos.color.replace(')', `, ${alpha})`).replace('hsl', 'hsla');
                     ctx.fill();
                 });
 
+                // Draw the ball itself
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.getColor();
@@ -536,6 +606,7 @@
 
         restartBtn.addEventListener('click', () => {
             balls = [new Ball()];
+            clearCanvasBtn.click();
             ballCountSpan.textContent = balls.length;
         });
 
@@ -572,17 +643,94 @@
         function update() {
             if (!isPlaying) return;
 
-            ctx.fillStyle = 'black';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (!paintEffect.checked) {
+                // Normal mode - clear everything each frame
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (drawInsideShape.checked) {
+                    drawBoundary();
+                } else {
+                    // Draw only the boundary stroke
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    
+                    switch(shapeSelect.value) {
+                        case 'circle':
+                            ctx.arc(centerX, centerY, boundaryRadius, 0, Math.PI * 2);
+                            break;
+                        case 'square':
+                            const points = generatePolygonPoints(4);
+                            ctx.moveTo(points[0].x, points[0].y);
+                            points.forEach(point => ctx.lineTo(point.x, point.y));
+                            ctx.closePath();
+                            break;
+                        case 'triangle':
+                            const triPoints = generatePolygonPoints(3);
+                            ctx.moveTo(triPoints[0].x, triPoints[0].y);
+                            triPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                            ctx.closePath();
+                            break;
+                        case 'hexagon':
+                            const hexPoints = generatePolygonPoints(6);
+                            ctx.moveTo(hexPoints[0].x, hexPoints[0].y);
+                            hexPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                            ctx.closePath();
+                            break;
+                        case 'octagon':
+                            const octPoints = generatePolygonPoints(8);
+                            ctx.moveTo(octPoints[0].x, octPoints[0].y);
+                            octPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                            ctx.closePath();
+                            break;
+                    }
+                    ctx.stroke();
+                }
+            } else {
+                // Paint effect mode - only draw the boundary stroke
+                ctx.beginPath();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                
+                switch(shapeSelect.value) {
+                    case 'circle':
+                        ctx.arc(centerX, centerY, boundaryRadius, 0, Math.PI * 2);
+                        break;
+                    case 'square':
+                        const points = generatePolygonPoints(4);
+                        ctx.moveTo(points[0].x, points[0].y);
+                        points.forEach(point => ctx.lineTo(point.x, point.y));
+                        ctx.closePath();
+                        break;
+                    case 'triangle':
+                        const triPoints = generatePolygonPoints(3);
+                        ctx.moveTo(triPoints[0].x, triPoints[0].y);
+                        triPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                        ctx.closePath();
+                        break;
+                    case 'hexagon':
+                        const hexPoints = generatePolygonPoints(6);
+                        ctx.moveTo(hexPoints[0].x, hexPoints[0].y);
+                        hexPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                        ctx.closePath();
+                        break;
+                    case 'octagon':
+                        const octPoints = generatePolygonPoints(8);
+                        ctx.moveTo(octPoints[0].x, octPoints[0].y);
+                        octPoints.forEach(point => ctx.lineTo(point.x, point.y));
+                        ctx.closePath();
+                        break;
+                }
+                ctx.stroke();
+            }
 
-            drawBoundary();
-
+            // Handle ball collisions
             for (let i = 0; i < balls.length; i++) {
                 for (let j = i + 1; j < balls.length; j++) {
                     balls[i].checkCollisionWithBall(balls[j]);
                 }
             }
 
+            // Update and draw each ball
             balls.forEach(ball => {
                 ball.update();
                 ball.draw();
@@ -722,6 +870,13 @@
             canvas.height = height;
             // Optionally, restart the simulation to fit the new canvas size
             restartBtn.click();
+        });
+
+        const clearCanvasBtn = document.getElementById('clearCanvasBtn');
+        clearCanvasBtn.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBoundary();
+            balls.forEach(ball => ball.trail = []);
         });
 
         update();
